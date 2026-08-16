@@ -293,8 +293,12 @@ header {
   pointer-events: none;
 }
 
-.secondary::before {
-  background: color-mix(in srgb, var(--gold) 20%, transparent);
+/* Opaque, not a tint: it has to stay legible under white label text, which
+   rules out the brighter golds. Needs the .controls prefix to outweigh the
+   `.controls button::before` default above — without it the dark overlay
+   meant for the gold buttons wins and the fill vanishes into the surface. */
+.controls .secondary::before {
+  background: var(--gold-dim);
 }
 
 .label {
@@ -306,8 +310,10 @@ header {
   color: #0a0a0c;
 }
 
+/* Solid rather than transparent: the playback fill needs a surface to read
+   against, and over the page background a tint that subtle is invisible. */
 .secondary {
-  background: transparent;
+  background: var(--surface-hi);
   border: 1px solid var(--border);
   color: var(--text);
 }
