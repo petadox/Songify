@@ -7,6 +7,8 @@
 // numbered card back used as the grid tile), plus distorted.mp3 and real.mp3.
 // Run scripts/import-images.sh to regenerate the images.
 
+import { normalise } from '../utils/text'
+
 // Artists are transcribed from the credit line printed on each poster, so the
 // reveal screen matches the physical card rather than the streaming credits
 // (which often list extra featured artists).
@@ -60,6 +62,21 @@ export const songs = RAW.map(([id, title, artist], index) => ({
 
 export function findSong(id) {
   return songs.find((song) => song.id === id)
+}
+
+// Every spelling of a title we'll accept. Beyond the shared normalisation,
+// the version without a parenthetical counts too — nobody types
+// "I'm Good (Blue)" when "I'm Good" is the song.
+function titleVariants(title) {
+  const forms = new Set([normalise(title)])
+  const withoutParens = title.replace(/\([^)]*\)/g, '')
+  if (normalise(withoutParens)) forms.add(normalise(withoutParens))
+  return forms
+}
+
+export function matchesTitle(song, guess) {
+  if (!guess?.trim()) return false
+  return titleVariants(song.title).has(normalise(guess))
 }
 
 // Posters are 1084x1508 in print; every card and image uses this ratio.

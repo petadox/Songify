@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { findSong, COVER_RATIO } from '../data/songs'
+import { findSong, matchesTitle, COVER_RATIO } from '../data/songs'
 import { lifelines } from '../data/lifelines'
 import {
   useSong,
@@ -14,8 +14,18 @@ import { useClip } from '../composables/useClip'
 const props = defineProps({ id: { type: String, required: true } })
 
 const song = computed(() => findSong(props.id))
-const { playsLeft, revealed, result, hints, countPlay, reveal, setResult } =
-  useSong(props.id)
+const {
+  plays,
+  playsLeft,
+  revealed,
+  result,
+  hints,
+  countPlay,
+  reveal,
+  setResult,
+} = useSong(props.id)
+
+const titleGuess = ref('')
 
 // Both clips are set up here so their lifecycle hooks register during setup.
 // Neither fetches anything yet — useClip builds its Audio element on the first
@@ -46,6 +56,10 @@ async function playDistorted() {
 const flipped = ref(revealed.value)
 const revealing = ref(false)
 
+// He has to actually hear the clip before committing — otherwise "Resolver"
+// is just a button that hands over the answer.
+const canResolve = computed(() => plays.value > 0 && !revealing.value)
+
 // Don't start the flip until the poster is decoded, or the card would turn to
 // a blank face on a slow connection. Capped so a failed load can't hang it.
 function preload(src) {
@@ -66,9 +80,11 @@ function useLifeline(lifeline) {
 }
 
 async function onReveal() {
-  if (revealing.value) return
+  if (!canResolve.value) return
   revealing.value = true
   distorted.stop()
+  // An empty or wrong answer both count as a miss — resolving is committing.
+  setResult(matchesTitle(song.value, titleGuess.value) ? 'correct' : 'wrong')
   reveal()
   await preload(song.value.cover)
   flipped.value = true
@@ -105,7 +121,7 @@ async function onReveal() {
       </div>
     </template>
 
-    <div class="art" :class="{ flipped }">
+    <div class="art" :class="[{ flipped }, result]">
       <div class="flipper">
         <img class="face front" :src="song.blur" alt="" />
         <!-- Only mounted once revealed, so the poster isn't fetched early. -->
@@ -132,10 +148,16 @@ async function onReveal() {
       <template v-else>¡Error! Eres lamentable!</template>
     </p>
 
-    <p v-if="flipped" class="title">
-      {{ song.title }}
-      <span v-if="song.artist" class="artist">{{ song.artist }}</span>
-    </p>
+    <template v-if="flipped">
+      <p v-if="result" class="outcome" :class="result">
+        {{ result === 'correct' ? '✓ ¡Acertada!' : '✕ Fallada' }}
+      </p>
+
+      <p class="title">
+        {{ song.title }}
+        <span v-if="song.artist" class="artist">{{ song.artist }}</span>
+      </p>
+    </template>
 
     <div class="controls">
       <template v-if="!flipped">
@@ -156,9 +178,23 @@ async function onReveal() {
         </button>
         <p v-if="distortedError" class="err">No se pudo cargar el audio.</p>
 
-        <button class="secondary" :disabled="revealing" @click="onReveal">
-          {{ revealing ? 'Resolviendo…' : 'Resolver' }}
-        </button>
+        <form class="answer" @submit.prevent="onReveal">
+          <input
+            v-model="titleGuess"
+            type="text"
+            class="field"
+            placeholder="¿Qué canción es?"
+            autocomplete="off"
+            autocapitalize="words"
+            spellcheck="false"
+            enterkeyhint="done"
+          />
+          <button type="submit" class="secondary" :disabled="!canResolve">
+            {{ revealing ? 'Resolviendo…' : 'Resolver' }}
+          </button>
+        </form>
+
+        <p v-if="!plays" class="note">Escucha el audio antes de resolver</p>
       </template>
 
       <template v-else>
@@ -185,17 +221,6 @@ async function onReveal() {
           </span>
         </button>
 
-        <template v-if="!result">
-          <p class="ask">¿La has acertado?</p>
-          <div class="verdict">
-            <button class="ok" @click="setResult('correct')">Sí</button>
-            <button class="no" @click="setResult('wrong')">No</button>
-          </div>
-        </template>
-
-        <p v-else class="outcome" :class="result">
-          {{ result === 'correct' ? '✓ Acertada' : '✕ Fallada' }}
-        </p>
       </template>
     </div>
 
@@ -280,6 +305,17 @@ header {
 .face.back {
   transform: rotateY(180deg);
   border-color: var(--gold-dim);
+}
+
+/* The verdict rides in on the card itself as it turns. */
+.art.correct .face.back {
+  border: 2px solid var(--ok);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--ok) 35%, transparent);
+}
+
+.art.wrong .face.back {
+  border: 2px solid var(--fail);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--fail) 35%, transparent);
 }
 
 /* No 3D for anyone who's asked the OS to tone down motion — just swap. */
@@ -434,34 +470,44 @@ header {
   text-decoration: line-through;
 }
 
-.ask {
-  margin: 6px 0 0;
-  text-align: center;
-  color: var(--text-dim);
-  font-size: 0.95rem;
-}
-
-.verdict {
+.answer {
   display: flex;
+  flex-direction: column;
   gap: 10px;
 }
 
-.verdict button {
+.field {
+  width: 100%;
+  padding: 13px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  /* Anything under 16px makes iOS Safari zoom the page on focus. */
+  font-size: 16px;
 }
 
-.ok {
-  color: var(--ok);
+.field::placeholder {
+  color: var(--text-dim);
 }
 
-.no {
-  color: var(--fail);
+.field:focus {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+
+.note {
+  margin: -2px 0 0;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--text-dim);
 }
 
 .outcome {
-  margin: 4px 0 0;
+  margin: 14px 0 0;
   text-align: center;
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: 700;
 }
 
 .outcome.correct {

@@ -8,6 +8,8 @@
 // Assets live in public/lifelines/<id>.{mp3,jpg}. Filenames are kept ASCII —
 // an accented name in a URL invites encoding problems.
 
+import { normalise } from '../utils/text'
+
 const base = import.meta.env.BASE_URL
 
 export const lifelines = [
@@ -36,17 +38,6 @@ export const lifelines = [
     answers: ['Mia', 'Mia Khalifa'],
   },
 ]
-
-// Lowercase, strip accents, collapse inner whitespace. Means "MIA KHALIFA",
-// "mia  khalifa" and "jordi el nino polla" all count.
-function normalise(value) {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // combining marks left by NFD
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, ' ')
-}
 
 export function matchesAnswer(lifeline, guess) {
   if (!guess?.trim()) return false
