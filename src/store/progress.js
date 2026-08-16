@@ -16,7 +16,9 @@ const RESULTS = ['correct', 'wrong']
 //   result   'correct' | 'wrong', set once he says whether he got it
 
 function blank() {
-  return { plays: 0, revealed: false, result: null }
+  // `hints` records the outcome of each lifeline spent on this song:
+  // { id, correct }. A correct one earns the artist's name.
+  return { plays: 0, revealed: false, result: null, hints: [] }
 }
 
 // Anything can be in localStorage — a half-written value, an older shape, or
@@ -35,6 +37,11 @@ function sanitise(raw) {
       plays: Number.isFinite(plays) ? Math.min(Math.max(0, plays), MAX_PLAYS) : 0,
       revealed: it.revealed === true,
       result: RESULTS.includes(it.result) ? it.result : null,
+      hints: Array.isArray(it.hints)
+        ? it.hints
+            .filter((h) => h && lifelines.some((l) => l.id === h.id))
+            .map((h) => ({ id: h.id, correct: h.correct === true }))
+        : [],
     }
   }
   return clean
@@ -58,7 +65,9 @@ watch(
   () => {
     const touched = {}
     for (const [id, it] of Object.entries(state)) {
-      if (it.plays > 0 || it.revealed || it.result) touched[id] = it
+      if (it.plays > 0 || it.revealed || it.result || it.hints.length) {
+        touched[id] = it
+      }
     }
     try {
       localStorage.setItem(KEY, JSON.stringify(touched))
@@ -81,6 +90,7 @@ export function useSong(id) {
     playsLeft: computed(() => Math.max(0, MAX_PLAYS - it.plays)),
     revealed: computed(() => it.revealed),
     result: computed(() => it.result),
+    hints: computed(() => it.hints),
     countPlay: () => {
       if (it.plays < MAX_PLAYS) it.plays += 1
     },
@@ -148,13 +158,25 @@ export const lifelinesLeft = computed(
 // SongView because the overlay is rendered at app level — a Teleport inside a
 // route component breaks when the route Transition remounts it.
 export const activeLifeline = ref(null)
+// Which song it was spent on, so the outcome can be written back to it.
+export const activeSongId = ref(null)
 
-export function openLifelineModal(lifeline) {
+export function openLifelineModal(lifeline, songId) {
   activeLifeline.value = lifeline
+  activeSongId.value = songId
 }
 
 export function closeLifelineModal() {
   activeLifeline.value = null
+  activeSongId.value = null
+}
+
+// Records how the guess went. First answer only — re-checking would let him
+// grind through spellings until the artist falls out.
+export function recordHint(songId, lifelineId, correct) {
+  const it = entry(songId)
+  if (it.hints.some((h) => h.id === lifelineId)) return
+  it.hints.push({ id: lifelineId, correct })
 }
 
 export function resetAll() {

@@ -1,7 +1,12 @@
 <script setup>
 import { watch } from 'vue'
 import { lifelines } from './data/lifelines'
-import { activeLifeline, closeLifelineModal } from './store/progress'
+import {
+  activeLifeline,
+  activeSongId,
+  closeLifelineModal,
+  recordHint,
+} from './store/progress'
 import { useClip } from './composables/useClip'
 import LifelineModal from './components/LifelineModal.vue'
 
@@ -15,6 +20,14 @@ watch(activeLifeline, (now, before) => {
   if (before) clips[before.id].stop() // don't let it outlive its modal
   if (now) clips[now.id].play()
 })
+
+// The outcome belongs to the song the lifeline was spent on, which the modal
+// itself has no reason to know about.
+function onChecked(correct) {
+  if (activeSongId.value && activeLifeline.value) {
+    recordHint(activeSongId.value, activeLifeline.value.id, correct)
+  }
+}
 </script>
 
 <template>
@@ -29,6 +42,7 @@ watch(activeLifeline, (now, before) => {
   <LifelineModal
     v-if="activeLifeline"
     :lifeline="activeLifeline"
+    @checked="onChecked"
     @close="closeLifelineModal"
   />
 </template>

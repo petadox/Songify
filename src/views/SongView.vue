@@ -14,9 +14,8 @@ import { useClip } from '../composables/useClip'
 const props = defineProps({ id: { type: String, required: true } })
 
 const song = computed(() => findSong(props.id))
-const { playsLeft, revealed, result, countPlay, reveal, setResult } = useSong(
-  props.id,
-)
+const { playsLeft, revealed, result, hints, countPlay, reveal, setResult } =
+  useSong(props.id)
 
 // Both clips are set up here so their lifecycle hooks register during setup.
 // Neither fetches anything yet — useClip builds its Audio element on the first
@@ -63,7 +62,7 @@ function useLifeline(lifeline) {
   if (isSpent(lifeline.id)) return
   distorted.stop()
   spendLifeline(lifeline.id)
-  openLifelineModal(lifeline)
+  openLifelineModal(lifeline, props.id)
 }
 
 async function onReveal() {
@@ -98,6 +97,20 @@ async function onReveal() {
         />
       </div>
     </div>
+
+    <!-- What each spent lifeline earned him on this song. A right answer buys
+         the artist's name; a wrong one buys nothing. -->
+    <p
+      v-for="hint in hints"
+      :key="hint.id"
+      class="hint"
+      :class="hint.correct ? 'correct' : 'wrong'"
+    >
+      <template v-if="hint.correct">
+        ¡Correcto! El artista es: {{ song.artist }}
+      </template>
+      <template v-else>¡Error! Eres lamentable!</template>
+    </p>
 
     <p v-if="flipped" class="title">
       {{ song.title }}
@@ -277,6 +290,28 @@ header {
   .art:not(.flipped) .face.back {
     display: none;
   }
+}
+
+.hint {
+  margin: 12px 0 0;
+  padding: 9px 12px;
+  border-radius: var(--radius);
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.hint.correct {
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ok) 40%, transparent);
+}
+
+.hint.wrong {
+  color: var(--fail);
+  background: color-mix(in srgb, var(--fail) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fail) 40%, transparent);
 }
 
 .title {

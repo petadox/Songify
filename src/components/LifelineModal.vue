@@ -3,21 +3,19 @@ import { onMounted, onBeforeUnmount, ref } from 'vue'
 import { matchesAnswer } from '../data/lifelines'
 
 const props = defineProps({ lifeline: { type: Object, required: true } })
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'checked'])
 
 const sheet = ref(null)
 const guess = ref('')
 const verdict = ref(null) // null | 'correct' | 'wrong'
 
+// One attempt: the answer buys the artist's name, so unlimited retries would
+// hand it over for free.
 function check() {
-  if (!guess.value.trim()) return
-  verdict.value = matchesAnswer(props.lifeline, guess.value) ? 'correct' : 'wrong'
-}
-
-// Typing again clears the last verdict, so a stale "wrong" doesn't sit under a
-// half-corrected answer.
-function onInput() {
-  if (verdict.value === 'wrong') verdict.value = null
+  if (verdict.value || !guess.value.trim()) return
+  const correct = matchesAnswer(props.lifeline, guess.value)
+  verdict.value = correct ? 'correct' : 'wrong'
+  emit('checked', correct)
 }
 
 // Deliberately no backdrop-click dismissal — the only way out is the button.
@@ -57,10 +55,14 @@ onBeforeUnmount(() => {
           autocomplete="off"
           autocapitalize="words"
           spellcheck="false"
+          :disabled="!!verdict"
           :aria-invalid="verdict === 'wrong'"
-          @input="onInput"
         />
-        <button type="submit" class="check" :disabled="!guess.trim()">
+        <button
+          type="submit"
+          class="check"
+          :disabled="!guess.trim() || !!verdict"
+        >
           Comprobar
         </button>
       </form>
@@ -150,6 +152,11 @@ onBeforeUnmount(() => {
 .field:focus {
   outline: 2px solid var(--gold);
   outline-offset: 1px;
+}
+
+.field:disabled {
+  opacity: 0.6;
+  -webkit-text-fill-color: var(--text); /* Safari greys disabled text out */
 }
 
 .check {
