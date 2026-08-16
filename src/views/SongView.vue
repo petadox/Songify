@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { findSong, COVER_RATIO } from '../data/songs'
 import { useSong, MAX_PLAYS } from '../store/progress'
 import { useClip } from '../composables/useClip'
@@ -32,9 +32,32 @@ async function playDistorted() {
   if (await distorted.play()) countPlay()
 }
 
-function onReveal() {
+// `flipped` drives the visuals; the store's `revealed` is the saved fact.
+// They only differ for the moment between tapping Resolver and the poster
+// being ready to show. Starts already flipped for a song resolved earlier, so
+// revisiting doesn't replay the animation.
+const flipped = ref(revealed.value)
+const revealing = ref(false)
+
+// Don't start the flip until the poster is decoded, or the card would turn to
+// a blank face on a slow connection. Capped so a failed load can't hang it.
+function preload(src) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = img.onerror = resolve
+    img.src = src
+    setTimeout(resolve, 1500)
+  })
+}
+
+async function onReveal() {
+  if (revealing.value) return
+  revealing.value = true
   distorted.stop()
   reveal()
+  await preload(song.value.cover)
+  flipped.value = true
+  revealing.value = false
 }
 </script>
 
@@ -47,20 +70,26 @@ function onReveal() {
       <span class="num">{{ song.number }} / 30</span>
     </header>
 
-    <div class="art" :class="{ revealed }">
-      <img
-        :src="revealed ? song.cover : song.blur"
-        :alt="revealed ? song.title : ''"
-      />
+    <div class="art" :class="{ flipped }">
+      <div class="flipper">
+        <img class="face front" :src="song.blur" alt="" />
+        <!-- Only mounted once revealed, so the poster isn't fetched early. -->
+        <img
+          v-if="revealed"
+          class="face back"
+          :src="song.cover"
+          :alt="song.title"
+        />
+      </div>
     </div>
 
-    <p v-if="revealed" class="title">
+    <p v-if="flipped" class="title">
       {{ song.title }}
       <span v-if="song.artist" class="artist">{{ song.artist }}</span>
     </p>
 
     <div class="controls">
-      <template v-if="!revealed">
+      <template v-if="!flipped">
         <button class="primary" :disabled="!canPlay" @click="playDistorted">
           <template v-if="distortedLoading">Cargando…</template>
           <template v-else-if="distortedPlaying">Sonando…</template>
@@ -71,12 +100,23 @@ function onReveal() {
         </button>
         <p v-if="distortedError" class="err">No se pudo cargar el audio.</p>
 
-        <button class="secondary" @click="onReveal">Resolver</button>
+        <button class="secondary" :disabled="revealing" @click="onReveal">
+          {{ revealing ? 'Resolviendo…' : 'Resolver' }}
+        </button>
       </template>
 
       <template v-else>
         <button class="primary" :disabled="realPlaying" @click="real.play()">
           {{ realPlaying ? 'Sonando…' : 'Escuchar original' }}
+        </button>
+
+        <!-- No limit once resolved — the answer is already out. -->
+        <button
+          class="secondary"
+          :disabled="distortedPlaying"
+          @click="distorted.play()"
+        >
+          {{ distortedPlaying ? 'Sonando…' : 'Escuchar distorsionada' }}
         </button>
 
         <template v-if="!result">
@@ -141,30 +181,51 @@ header {
 .art {
   position: relative;
   aspect-ratio: v-bind(COVER_RATIO);
-  overflow: hidden;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--surface);
+  perspective: 1200px;
 }
 
-.art.revealed {
-  border-color: var(--gold-dim);
+.flipper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.7s cubic-bezier(0.4, 0.1, 0.2, 1);
 }
 
-.art img {
+.art.flipped .flipper {
+  transform: rotateY(180deg);
+}
+
+.face {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
-  animation: reveal 0.35s ease;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  /* Without this the far side shows through during the turn. */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
-@keyframes reveal {
-  from {
-    opacity: 0.3;
+.face.back {
+  transform: rotateY(180deg);
+  border-color: var(--gold-dim);
+}
+
+/* No 3D for anyone who's asked the OS to tone down motion — just swap. */
+@media (prefers-reduced-motion: reduce) {
+  .flipper,
+  .art.flipped .flipper {
+    transform: none;
   }
-  to {
-    opacity: 1;
+  .face.back {
+    transform: none;
+  }
+  .art:not(.flipped) .face.back {
+    display: none;
   }
 }
 

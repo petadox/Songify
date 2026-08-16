@@ -1,7 +1,11 @@
 <script setup>
 import { songs } from '../data/songs'
-import { statusOf, summary } from '../store/progress'
+import { statusOf, summary, resetAll } from '../store/progress'
 import SongCard from '../components/SongCard.vue'
+
+function onReset() {
+  if (confirm('¿Borrar todo el progreso? No se puede deshacer.')) resetAll()
+}
 </script>
 
 <template>
@@ -19,6 +23,10 @@ import SongCard from '../components/SongCard.vue'
         <SongCard :song="song" :status="statusOf(song.id)" />
       </li>
     </ul>
+
+    <button v-if="summary.played" class="reset" @click="onReset">
+      Reiniciar
+    </button>
   </div>
 </template>
 
@@ -55,6 +63,15 @@ h1 {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
+}
+
+/* Deliberately quiet — it wipes everything, so it shouldn't invite a tap. */
+.reset {
+  display: block;
+  margin: 28px auto 0;
+  padding: 8px 16px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
 }
 
 @media (min-width: 480px) {
