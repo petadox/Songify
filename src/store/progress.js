@@ -106,6 +106,16 @@ export function useSong(id) {
 // Grid + score. A song counts as played once he's committed to an answer.
 export const statusOf = (id) => state[id]?.result ?? null
 
+// Anything worth offering a reset for — not just finished songs. Mirrors the
+// persistence filter, so a song merely opened doesn't count.
+export const hasProgress = computed(
+  () =>
+    spent.size > 0 ||
+    Object.values(state).some(
+      (it) => it.plays > 0 || it.revealed || it.result || it.hints.length,
+    ),
+)
+
 export const summary = computed(() => {
   const done = songs.filter((s) => state[s.id]?.result)
   return {

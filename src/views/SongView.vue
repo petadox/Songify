@@ -85,6 +85,26 @@ async function onReveal() {
       <span class="num">{{ song.number }} / 30</span>
     </header>
 
+    <!-- Hints only make sense before the answer is out. Keyed on `revealed`
+         rather than `flipped` so the row is gone before the card starts
+         turning — otherwise the artwork jumps mid-animation. -->
+    <template v-if="!revealed">
+      <p class="lifelines-title">Comodines</p>
+      <div class="lifelines">
+        <button
+          v-for="l in lifelines"
+          :key="l.id"
+          class="lifeline"
+          :class="{ used: isSpent(l.id) }"
+          :disabled="isSpent(l.id)"
+          :title="l.label"
+          @click="useLifeline(l)"
+        >
+          {{ l.label }}
+        </button>
+      </div>
+    </template>
+
     <div class="art" :class="{ flipped }">
       <div class="flipper">
         <img class="face front" :src="song.blur" alt="" />
@@ -139,22 +159,6 @@ async function onReveal() {
         <button class="secondary" :disabled="revealing" @click="onReveal">
           {{ revealing ? 'Resolviendo…' : 'Resolver' }}
         </button>
-
-        <!-- Hints only make sense before the answer is out. -->
-        <p class="lifelines-title">Comodines</p>
-        <div class="lifelines">
-          <button
-            v-for="l in lifelines"
-            :key="l.id"
-            class="lifeline"
-            :class="{ used: isSpent(l.id) }"
-            :disabled="isSpent(l.id)"
-            :title="l.label"
-            @click="useLifeline(l)"
-          >
-            {{ l.label }}
-          </button>
-        </div>
       </template>
 
       <template v-else>
@@ -392,8 +396,10 @@ header {
 
 /* Smaller and quieter than the main controls — they're a side option, not the
    thing he should reach for first. */
+/* Sit above the artwork so they're reachable without scrolling, but stay
+   quieter than the main controls — a side option, not the first move. */
 .lifelines-title {
-  margin: 10px 0 0;
+  margin: 2px 0 0;
   text-align: center;
   font-size: 0.7rem;
   font-weight: 600;
@@ -405,29 +411,25 @@ header {
 .lifelines {
   display: flex;
   gap: 8px;
-  margin-top: 6px;
+  margin: 6px 0 14px;
 }
 
-.controls .lifeline {
+.lifeline {
   flex: 1 1 0;
   min-width: 0;
-  min-height: 40px;
-  padding: 8px 6px;
+  min-height: 38px;
+  padding: 7px 6px;
   border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-dim);
-  font-size: 0.68rem;
+  font-size: 0.78rem;
   font-weight: 500;
   line-height: 1.25;
   overflow: hidden;
 }
 
-.controls .lifeline::before {
-  content: none; /* no playback fill on these */
-}
-
-.controls .lifeline.used {
+.lifeline.used {
   opacity: 0.3;
   text-decoration: line-through;
 }

@@ -1,7 +1,13 @@
 <script setup>
 import { songs } from '../data/songs'
 import { lifelines } from '../data/lifelines'
-import { statusOf, summary, resetAll, isSpent } from '../store/progress'
+import {
+  statusOf,
+  summary,
+  resetAll,
+  isSpent,
+  hasProgress,
+} from '../store/progress'
 import SongCard from '../components/SongCard.vue'
 
 function onReset() {
@@ -41,7 +47,7 @@ function onReset() {
       </li>
     </ul>
 
-    <button v-if="summary.played" class="reset" @click="onReset">
+    <button v-if="hasProgress" class="reset" @click="onReset">
       Reiniciar
     </button>
   </div>
@@ -103,8 +109,8 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 6px 12px;
-  font-size: 0.72rem;
+  gap: 6px 14px;
+  font-size: 0.9rem;
   color: var(--text-dim);
 }
 
