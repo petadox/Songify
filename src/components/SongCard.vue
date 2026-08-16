@@ -11,15 +11,17 @@ defineProps({
 <template>
   <RouterLink :to="`/song/${song.id}`" class="card" :class="status">
     <div class="art">
-      <!-- The clean poster is only requested once the song has been resolved,
-           so the answer is never sitting in the browser beforehand. -->
+      <!-- Face-down the tile is the physical card back; the clean poster is
+           only requested once resolved, so the answer is never sitting in the
+           browser beforehand. -->
       <img
-        :src="status ? song.cover : song.blur"
+        :src="status ? song.cover : song.back"
         :alt="status ? song.title : `Canción ${song.number}`"
         loading="lazy"
         decoding="async"
       />
-      <span class="number">{{ song.number }}</span>
+      <!-- The card back already has its number printed on it. -->
+      <span v-if="status" class="number">{{ song.number }}</span>
       <span v-if="status" class="badge" aria-hidden="true">
         {{ status === 'correct' ? '✓' : '✕' }}
       </span>
@@ -64,23 +66,16 @@ defineProps({
   display: block;
 }
 
+/* Only shown once resolved — the artwork is the point by then, so the number
+   sits quietly at the foot over a scrim. */
 .number {
   position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-size: 2.1rem;
-  font-weight: 600;
-  color: var(--text);
-  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.9);
-}
-
-.card.correct .number,
-.card.wrong .number {
-  /* once revealed the artwork is the point — tuck the number into a corner */
-  inset: auto 0 6px 0;
+  inset: auto 0 0 0;
+  padding: 14px 0 5px;
+  text-align: center;
   font-size: 0.95rem;
   color: var(--text-dim);
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
 }
 
 .badge {

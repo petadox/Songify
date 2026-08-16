@@ -3,9 +3,10 @@
 #
 # Usage:  ./scripts/import-images.sh "/path/to/Eon_con_sangrado_12px_FULL 2"
 #
-# For each song this writes two files into public/songs/<nn>/:
+# For each song this writes three files into public/songs/<nn>/:
 #   cover.jpg  the full poster, shown only after the player resolves
-#   blur.jpg   the obscured teaser, shown until then
+#   blur.jpg   the obscured teaser, shown in the song view until then
+#   back.jpg   the numbered card back, used as the grid tile until resolved
 #
 # Why the teaser is pre-generated instead of a CSS filter: these posters have
 # the song title printed on them in large type, and blur alone does not defeat
@@ -14,8 +15,8 @@
 # region of the artwork and blur that. The clean poster is never sent to the
 # browser until the reveal.
 #
-# Source files are "<n>_<Title>.PNG"; the number-only files are the physical
-# card backs and are skipped.
+# Source files are "<n>_<Title>.PNG" for the poster and "<n>.PNG" for the
+# matching card back.
 
 set -euo pipefail
 
@@ -63,7 +64,16 @@ for file in "$SRC"/[0-9]*_*.PNG "$SRC"/[0-9]*_*.png; do
     -vf "crop=$(crop_for "$num"),gblur=sigma=$SIGMA,eq=brightness=0.14:saturation=0.8:contrast=1.15,scale=$BLOCKS_W:-1:flags=neighbor,scale=420:584:flags=neighbor" \
     -q:v 6 "$out/blur.jpg"
 
-  echo "  $name -> songs/$padded/{cover,blur}.jpg"
+  # Card back — the numbered side of the physical card, used as the grid tile
+  # until the song is resolved. Only ever shown at thumbnail size.
+  if [[ -f "$SRC/$num.PNG" ]]; then
+    ffmpeg -y -loglevel error -i "$SRC/$num.PNG" \
+      -vf "scale=420:-1" -q:v 5 "$out/back.jpg"
+  else
+    echo "  ! no card back ($num.PNG) for song $padded" >&2
+  fi
+
+  echo "  $name -> songs/$padded/{cover,blur,back}.jpg"
   count=$((count + 1))
 done
 
