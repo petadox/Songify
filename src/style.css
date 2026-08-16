@@ -32,8 +32,10 @@
 body {
   margin: 0;
   background: var(--bg);
-  /* Never bounce-scroll horizontally on mobile */
-  overflow-x: hidden;
+  /* Never bounce-scroll horizontally on mobile. `clip` rather than `hidden`:
+     `hidden` makes body a scroll container, which stops position:sticky
+     descendants from sticking to the viewport. */
+  overflow-x: clip;
 }
 
 #app {

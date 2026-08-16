@@ -13,6 +13,11 @@ function onReset() {
   <div class="home">
     <header>
       <h1>Eongify</h1>
+    </header>
+
+    <!-- The title scrolls away; the score and lifelines pin to the top so
+         they're readable however far down the grid he is. -->
+    <div class="stats">
       <p class="score">
         {{ summary.played }} / {{ songs.length }} · {{ summary.correct }}
         {{ summary.correct === 1 ? 'acertada' : 'acertadas' }}
@@ -28,7 +33,7 @@ function onReset() {
           {{ l.label }}
         </li>
       </ul>
-    </header>
+    </div>
 
     <ul class="grid">
       <li v-for="song in songs" :key="song.id">
@@ -50,7 +55,19 @@ function onReset() {
 }
 
 header {
-  margin-bottom: 20px;
+  text-align: center;
+}
+
+/* Full-bleed via negative margins so the bar's background covers the page
+   gutters — otherwise cards scroll visibly past its edges. */
+.stats {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: 10px -16px 16px;
+  padding: 8px 16px 10px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
   text-align: center;
 }
 
@@ -62,7 +79,7 @@ h1 {
 }
 
 .score {
-  margin: 6px 0 0;
+  margin: 0;
   font-size: 0.9rem;
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
@@ -81,7 +98,7 @@ h1 {
    "what you had" rather than silently shrinking. */
 .lifelines {
   list-style: none;
-  margin: 12px 0 0;
+  margin: 7px 0 0;
   padding: 0;
   display: flex;
   flex-wrap: wrap;

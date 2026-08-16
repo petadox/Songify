@@ -12,7 +12,7 @@ const base = import.meta.env.BASE_URL
 export const lifelines = [
   {
     id: 'noches',
-    label: 'Buenas noches, arriba España',
+    label: 'España',
     audio: `${base}lifelines/noches.mp3`,
     image: `${base}lifelines/noches.jpg`,
     heading: 'Buenas noches, arriba España',
@@ -20,7 +20,7 @@ export const lifelines = [
   },
   {
     id: 'maricon',
-    label: 'Maricooooon',
+    label: 'Maricon',
     audio: `${base}lifelines/maricon.mp3`,
     image: null,
     heading: 'Maricooooon',
@@ -28,7 +28,7 @@ export const lifelines = [
   },
   {
     id: 'mujeres',
-    label: 'En fin, mujeres',
+    label: 'Mujeres',
     audio: `${base}lifelines/mujeres.mp3`,
     image: `${base}lifelines/mujeres.jpg`,
     heading: 'En fin, mujeres',
