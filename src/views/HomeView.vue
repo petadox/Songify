@@ -135,7 +135,8 @@ h1 {
   color: color-mix(in srgb, var(--text-dim) 60%, var(--bg));
 }
 
-/* Spent but never answered — he closed the modal without guessing. */
+/* Spent with no recorded outcome. Closing the modal now counts as a miss, so
+   this only shows if the page was reloaded while the modal was still open. */
 .lifelines .used .dot {
   background: transparent;
   box-shadow: inset 0 0 0 1px currentColor;

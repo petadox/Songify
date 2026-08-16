@@ -28,6 +28,15 @@ function onChecked(correct) {
     recordHint(activeSongId.value, activeLifeline.value.id, correct)
   }
 }
+
+// Leaving without answering counts as a miss. recordHint keeps the first
+// outcome, so this is a no-op when he already guessed.
+function onClose() {
+  if (activeSongId.value && activeLifeline.value) {
+    recordHint(activeSongId.value, activeLifeline.value.id, false)
+  }
+  closeLifelineModal()
+}
 </script>
 
 <template>
@@ -43,7 +52,7 @@ function onChecked(correct) {
     v-if="activeLifeline"
     :lifeline="activeLifeline"
     @checked="onChecked"
-    @close="closeLifelineModal"
+    @close="onClose"
   />
 </template>
 
