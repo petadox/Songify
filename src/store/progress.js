@@ -156,6 +156,18 @@ watch(
 
 export const isSpent = (id) => spent.has(id)
 
+// How each lifeline's guess went, keyed by lifeline id: 'correct' | 'wrong'.
+// The outcome is stored on whichever song it was spent on, and each lifeline
+// is spendable once, so there's at most one entry per id. A lifeline closed
+// without answering simply has none.
+export const lifelineOutcomes = computed(() => {
+  const out = {}
+  for (const it of Object.values(state)) {
+    for (const h of it.hints) out[h.id] = h.correct ? 'correct' : 'wrong'
+  }
+  return out
+})
+
 export function spendLifeline(id) {
   spent.add(id)
 }

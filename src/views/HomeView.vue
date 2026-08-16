@@ -7,6 +7,7 @@ import {
   resetAll,
   isSpent,
   hasProgress,
+  lifelineOutcomes,
 } from '../store/progress'
 import SongCard from '../components/SongCard.vue'
 
@@ -33,7 +34,7 @@ function onReset() {
         <li
           v-for="l in lifelines"
           :key="l.id"
-          :class="{ used: isSpent(l.id) }"
+          :class="[{ used: isSpent(l.id) }, lifelineOutcomes[l.id]]"
         >
           <span class="dot" aria-hidden="true"></span>
           {{ l.label }}
@@ -121,20 +122,33 @@ h1 {
 }
 
 .lifelines .dot {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--gold);
 }
 
+/* Dim via colour, not opacity: opacity on the row would also wash out the
+   red/green dot, which is the one part that has to stay legible. */
 .lifelines .used {
-  opacity: 0.4;
   text-decoration: line-through;
+  color: color-mix(in srgb, var(--text-dim) 60%, var(--bg));
 }
 
+/* Spent but never answered — he closed the modal without guessing. */
 .lifelines .used .dot {
   background: transparent;
-  box-shadow: inset 0 0 0 1px var(--text-dim);
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+
+.lifelines .correct .dot {
+  background: var(--ok);
+  box-shadow: none;
+}
+
+.lifelines .wrong .dot {
+  background: var(--fail);
+  box-shadow: none;
 }
 
 /* Deliberately quiet — it wipes everything, so it shouldn't invite a tap. */
