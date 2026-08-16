@@ -1,6 +1,7 @@
 import { ref, onBeforeUnmount } from 'vue'
 
 const STALL_TIMEOUT = 8000
+const FALLBACK_DURATION = 5 // clips are all 5s; only used if metadata is late
 
 // A single 5s clip. Kept deliberately small: one Audio element per clip, so
 // the distorted and real clips never fight over playback state.
@@ -12,24 +13,57 @@ export function useClip(src) {
   const playing = ref(false)
   const loading = ref(false)
   const error = ref(false)
+  const progress = ref(0) // 0..1 through the clip, for the button fill
 
   let el = null
+  let raf = null
+
+  // 'timeupdate' only fires about four times a second, which visibly steps on
+  // a clip this short — so drive the bar off the frame loop instead.
+  function tick() {
+    if (!el) return
+    const total = Number.isFinite(el.duration) && el.duration > 0
+      ? el.duration
+      : FALLBACK_DURATION
+    progress.value = Math.min(el.currentTime / total, 1)
+    raf = requestAnimationFrame(tick)
+  }
+
+  function startTicking() {
+    if (raf === null) raf = requestAnimationFrame(tick)
+  }
+
+  function stopTicking(reset = true) {
+    if (raf !== null) {
+      cancelAnimationFrame(raf)
+      raf = null
+    }
+    if (reset) progress.value = 0
+  }
 
   function ensure() {
     if (el) return el
     el = new Audio(src)
     el.preload = 'auto'
-    el.addEventListener('ended', () => (playing.value = false))
-    el.addEventListener('pause', () => (playing.value = false))
+    el.addEventListener('ended', () => {
+      playing.value = false
+      stopTicking()
+    })
+    el.addEventListener('pause', () => {
+      playing.value = false
+      stopTicking()
+    })
     el.addEventListener('playing', () => {
       playing.value = true
       loading.value = false
+      startTicking()
     })
     el.addEventListener('waiting', () => (loading.value = true))
     el.addEventListener('error', () => {
       error.value = true
       loading.value = false
       playing.value = false
+      stopTicking()
     })
     return el
   }
@@ -55,6 +89,7 @@ export function useClip(src) {
       // output, which would strand the button on "Cargando…".
       loading.value = false
       playing.value = true
+      startTicking()
       return true
     } catch {
       // Autoplay refusal, decode failure or a stall — don't burn an attempt.
@@ -62,6 +97,7 @@ export function useClip(src) {
       loading.value = false
       playing.value = false
       error.value = true
+      stopTicking()
       return false
     }
   }
@@ -70,14 +106,16 @@ export function useClip(src) {
     if (!el) return
     el.pause()
     el.currentTime = 0
+    stopTicking()
   }
 
   onBeforeUnmount(() => {
+    stopTicking()
     if (!el) return
     el.pause()
     el.src = ''
     el = null
   })
 
-  return { play, stop, playing, loading, error }
+  return { play, stop, playing, loading, error, progress }
 }

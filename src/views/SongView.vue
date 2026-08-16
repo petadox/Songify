@@ -21,8 +21,9 @@ const {
   playing: distortedPlaying,
   loading: distortedLoading,
   error: distortedError,
+  progress: distortedProgress,
 } = distorted
-const { playing: realPlaying } = real
+const { playing: realPlaying, progress: realProgress } = real
 
 const canPlay = computed(() => playsLeft.value > 0 && !distortedPlaying.value)
 
@@ -90,13 +91,20 @@ async function onReveal() {
 
     <div class="controls">
       <template v-if="!flipped">
-        <button class="primary" :disabled="!canPlay" @click="playDistorted">
-          <template v-if="distortedLoading">Cargando…</template>
-          <template v-else-if="distortedPlaying">Sonando…</template>
-          <template v-else-if="playsLeft === 0">Sin intentos</template>
-          <template v-else>
-            Escuchar · {{ playsLeft }} de {{ MAX_PLAYS }}
-          </template>
+        <button
+          class="primary"
+          :style="{ '--p': distortedProgress }"
+          :disabled="!canPlay"
+          @click="playDistorted"
+        >
+          <span class="label">
+            <template v-if="distortedLoading">Cargando…</template>
+            <template v-else-if="distortedPlaying">Sonando…</template>
+            <template v-else-if="playsLeft === 0">Sin intentos</template>
+            <template v-else>
+              Escuchar · {{ playsLeft }} de {{ MAX_PLAYS }}
+            </template>
+          </span>
         </button>
         <p v-if="distortedError" class="err">No se pudo cargar el audio.</p>
 
@@ -106,17 +114,27 @@ async function onReveal() {
       </template>
 
       <template v-else>
-        <button class="primary" :disabled="realPlaying" @click="real.play()">
-          {{ realPlaying ? 'Sonando…' : 'Escuchar original' }}
+        <button
+          class="primary"
+          :style="{ '--p': realProgress }"
+          :disabled="realPlaying"
+          @click="real.play()"
+        >
+          <span class="label">
+            {{ realPlaying ? 'Sonando…' : 'Escuchar original' }}
+          </span>
         </button>
 
         <!-- No limit once resolved — the answer is already out. -->
         <button
           class="secondary"
+          :style="{ '--p': distortedProgress }"
           :disabled="distortedPlaying"
           @click="distorted.play()"
         >
-          {{ distortedPlaying ? 'Sonando…' : 'Escuchar distorsionada' }}
+          <span class="label">
+            {{ distortedPlaying ? 'Sonando…' : 'Escuchar distorsionada' }}
+          </span>
         </button>
 
         <template v-if="!result">
@@ -253,12 +271,34 @@ header {
 }
 
 .controls button {
+  position: relative;
   width: 100%;
   padding: 14px;
   border-radius: var(--radius);
   font-size: 1rem;
   font-weight: 600;
+  overflow: hidden;
   transition: opacity 0.15s ease;
+}
+
+/* Playback position, drawn as a fill sweeping the button. Driven by scaleX so
+   it stays on the compositor — animating width would relayout every frame. */
+.controls button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: scaleX(var(--p, 0));
+  transform-origin: left;
+  background: rgba(0, 0, 0, 0.22);
+  pointer-events: none;
+}
+
+.secondary::before {
+  background: color-mix(in srgb, var(--gold) 20%, transparent);
+}
+
+.label {
+  position: relative; /* above the fill */
 }
 
 .primary {
