@@ -1,7 +1,9 @@
 <template>
   <RouterView v-slot="{ Component }">
     <Transition name="fade" mode="out-in">
-      <component :is="Component" />
+      <!-- Keyed on the route so going straight from one song to another
+           remounts rather than reusing stale clip state. -->
+      <component :is="Component" :key="$route.fullPath" />
     </Transition>
   </RouterView>
 </template>

@@ -1,10 +1,7 @@
 <script setup>
 import { songs } from '../data/songs'
+import { statusOf, summary } from '../store/progress'
 import SongCard from '../components/SongCard.vue'
-
-// Wired to real progress in iteration 3.
-const played = 0
-const correct = 0
 </script>
 
 <template>
@@ -12,13 +9,14 @@ const correct = 0
     <header>
       <h1>Eongify</h1>
       <p class="score">
-        {{ played }} / {{ songs.length }} · {{ correct }} acertadas
+        {{ summary.played }} / {{ songs.length }} · {{ summary.correct }}
+        {{ summary.correct === 1 ? 'acertada' : 'acertadas' }}
       </p>
     </header>
 
     <ul class="grid">
       <li v-for="song in songs" :key="song.id">
-        <SongCard :song="song" />
+        <SongCard :song="song" :status="statusOf(song.id)" />
       </li>
     </ul>
   </div>

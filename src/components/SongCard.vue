@@ -66,16 +66,20 @@ defineProps({
   display: block;
 }
 
-/* Only shown once resolved — the artwork is the point by then, so the number
-   sits quietly at the foot over a scrim. */
+/* Only shown once resolved. Top-left, mirroring where the card back prints
+   its number — the foot of the poster already carries its own lyric text. */
 .number {
   position: absolute;
-  inset: auto 0 0 0;
-  padding: 14px 0 5px;
+  top: 6px;
+  left: 6px;
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 11px;
   text-align: center;
-  font-size: 0.95rem;
-  color: var(--text-dim);
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.6);
 }
 
 .badge {
