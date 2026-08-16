@@ -128,6 +128,7 @@ async function onReveal() {
         </button>
 
         <!-- Hints only make sense before the answer is out. -->
+        <p class="lifelines-title">Comodines</p>
         <div class="lifelines">
           <button
             v-for="l in lifelines"
@@ -356,10 +357,20 @@ header {
 
 /* Smaller and quieter than the main controls — they're a side option, not the
    thing he should reach for first. */
+.lifelines-title {
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
 .lifelines {
   display: flex;
   gap: 8px;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .controls .lifeline {

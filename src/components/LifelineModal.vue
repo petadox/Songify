@@ -1,10 +1,24 @@
 <script setup>
 import { onMounted, onBeforeUnmount, ref } from 'vue'
+import { matchesAnswer } from '../data/lifelines'
 
-defineProps({ lifeline: { type: Object, required: true } })
+const props = defineProps({ lifeline: { type: Object, required: true } })
 const emit = defineEmits(['close'])
 
-const closeBtn = ref(null)
+const sheet = ref(null)
+const guess = ref('')
+const verdict = ref(null) // null | 'correct' | 'wrong'
+
+function check() {
+  if (!guess.value.trim()) return
+  verdict.value = matchesAnswer(props.lifeline, guess.value) ? 'correct' : 'wrong'
+}
+
+// Typing again clears the last verdict, so a stale "wrong" doesn't sit under a
+// half-corrected answer.
+function onInput() {
+  if (verdict.value === 'wrong') verdict.value = null
+}
 
 // Deliberately no backdrop-click dismissal — the only way out is the button.
 function onKey(e) {
@@ -12,7 +26,10 @@ function onKey(e) {
 }
 
 onMounted(() => {
-  closeBtn.value?.focus()
+  // Focus the dialog itself, not a control: focusing the input would pop the
+  // mobile keyboard over the photo, and focusing Volver would make a stray
+  // Enter dismiss the whole thing.
+  sheet.value?.focus()
   window.addEventListener('keydown', onKey)
   // Stop the grid behind from scrolling under the overlay.
   document.body.style.overflow = 'hidden'
@@ -25,16 +42,34 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="backdrop" role="dialog" aria-modal="true" :aria-label="lifeline.heading">
-    <div class="sheet">
+  <div class="backdrop" role="dialog" aria-modal="true" :aria-label="lifeline.label">
+    <div ref="sheet" class="sheet" tabindex="-1">
       <img v-if="lifeline.image" :src="lifeline.image" alt="" class="shot" />
 
-      <div class="copy">
-        <h2 v-if="lifeline.heading">{{ lifeline.heading }}</h2>
-        <p v-if="lifeline.body">{{ lifeline.body }}</p>
-      </div>
+      <p v-if="lifeline.body" class="prompt">{{ lifeline.body }}</p>
 
-      <button ref="closeBtn" class="close" @click="emit('close')">Volver</button>
+      <form class="guess" @submit.prevent="check">
+        <input
+          v-model="guess"
+          type="text"
+          class="field"
+          placeholder="Tu respuesta"
+          autocomplete="off"
+          autocapitalize="words"
+          spellcheck="false"
+          :aria-invalid="verdict === 'wrong'"
+          @input="onInput"
+        />
+        <button type="submit" class="check" :disabled="!guess.trim()">
+          Comprobar
+        </button>
+      </form>
+
+      <p v-if="verdict" class="verdict" :class="verdict" role="status">
+        {{ verdict === 'correct' ? '✓ ¡Correcto!' : '✕ No es esa' }}
+      </p>
+
+      <button class="close" @click="emit('close')">Volver</button>
     </div>
   </div>
 </template>
@@ -61,7 +96,7 @@ onBeforeUnmount(() => {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   padding: 18px;
   border-radius: 16px;
   border: 1px solid var(--gold-dim);
@@ -69,27 +104,82 @@ onBeforeUnmount(() => {
   animation: rise 0.25s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
+/* Focused programmatically for screen readers; no visible ring wanted. */
+.sheet:focus {
+  outline: none;
+}
+
 .shot {
   width: 100%;
+  /* Portraits vary in shape; a fixed frame keeps the sheet from jumping. */
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
   border-radius: var(--radius);
   display: block;
 }
 
-.copy {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-h2 {
-  font-size: 1.2rem;
+.prompt {
+  margin: 0;
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 600;
   color: var(--gold);
 }
 
-p {
-  margin: 0;
+.guess {
+  display: flex;
+  gap: 8px;
+}
+
+.field {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg);
   color: var(--text);
+  /* Anything under 16px makes iOS Safari zoom the page on focus. */
+  font-size: 16px;
+}
+
+.field::placeholder {
+  color: var(--text-dim);
+}
+
+.field:focus {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+
+.check {
+  flex: 0 0 auto;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  font-weight: 600;
+  background: var(--surface-hi);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.check:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.verdict {
+  margin: -4px 0 0;
+  text-align: center;
+  font-weight: 600;
   font-size: 0.95rem;
+}
+
+.verdict.correct {
+  color: var(--ok);
+}
+
+.verdict.wrong {
+  color: var(--fail);
 }
 
 .close {

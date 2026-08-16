@@ -1,39 +1,57 @@
 // Three lifelines, each spendable once across the whole game.
 //
-// EVERYTHING BELOW IS PLACEHOLDER CONTENT. The sounds are generated sine tones
-// and the images are ffmpeg test patterns, both there only to prove the layout.
-// Replace the files in public/lifelines/ and the `heading`/`body` copy here.
+// Each one plays its sound, shows a picture, and asks the player to name the
+// person. `answers` lists every accepted spelling; matching is forgiving about
+// case, accents and spacing (see `matchesAnswer`), so the first entry is just
+// the canonical one.
 //
-// `image` is optional — "maricon" deliberately has none, so both the
-// with-image and text-only layouts are visible in the prototype.
+// Assets live in public/lifelines/<id>.{mp3,jpg}. Filenames are kept ASCII —
+// an accented name in a URL invites encoding problems.
 
 const base = import.meta.env.BASE_URL
 
 export const lifelines = [
   {
-    id: 'noches',
+    id: 'espana',
     label: 'España',
-    audio: `${base}lifelines/noches.mp3`,
-    image: `${base}lifelines/noches.jpg`,
-    heading: 'Buenas noches, arriba España',
-    body: 'Texto de ejemplo para esta pista. Aquí irá la ayuda real: una frase, un dato o lo que quieras contarle.',
+    audio: `${base}lifelines/espana.mp3`,
+    image: `${base}lifelines/espana.jpg`,
+    body: 'Nombre del ilustre cardiólogo',
+    answers: ['Jordi', 'Jordi el niño polla'],
   },
   {
     id: 'maricon',
     label: 'Maricon',
     audio: `${base}lifelines/maricon.mp3`,
-    image: null,
-    heading: 'Maricooooon',
-    body: 'Esta pista no lleva imagen, sólo texto, para ver cómo queda el modal sin foto. Cambia este contenido cuando lo tengas decidido.',
+    image: `${base}lifelines/maricon.jpg`,
+    body: 'Nombre del exitoso influencer',
+    answers: ['Aless', 'Aless Gibaja'],
   },
   {
     id: 'mujeres',
     label: 'Mujeres',
     audio: `${base}lifelines/mujeres.mp3`,
     image: `${base}lifelines/mujeres.jpg`,
-    heading: 'En fin, mujeres',
-    body: 'Otro texto de relleno. La imagen de arriba es una carta de ajuste de ffmpeg, así que no te asustes.',
+    body: 'Nombre de la reputada abogada',
+    answers: ['Mia', 'Mia Khalifa'],
   },
 ]
+
+// Lowercase, strip accents, collapse inner whitespace. Means "MIA KHALIFA",
+// "mia  khalifa" and "jordi el nino polla" all count.
+function normalise(value) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // combining marks left by NFD
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ')
+}
+
+export function matchesAnswer(lifeline, guess) {
+  if (!guess?.trim()) return false
+  const attempt = normalise(guess)
+  return lifeline.answers.some((a) => normalise(a) === attempt)
+}
 
 export const findLifeline = (id) => lifelines.find((l) => l.id === id)
