@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onBeforeUnmount } from 'vue'
 import { findSong, matchesTitle, COVER_RATIO } from '../data/songs'
 import { lifelines } from '../data/lifelines'
 import {
@@ -79,6 +79,11 @@ function useLifeline(lifeline) {
   openLifelineModal(lifeline, props.id)
 }
 
+// Matches the .flipper transition below; the original starts once the card has
+// finished turning.
+const FLIP_MS = 700
+let flipTimer = null
+
 async function onReveal() {
   if (!canResolve.value) return
   revealing.value = true
@@ -86,10 +91,15 @@ async function onReveal() {
   // An empty or wrong answer both count as a miss — resolving is committing.
   setResult(matchesTitle(song.value, titleGuess.value) ? 'correct' : 'wrong')
   reveal()
+  // Still inside the click, so the later autoplay is permitted on mobile.
+  real.prime()
   await preload(song.value.cover)
   flipped.value = true
   revealing.value = false
+  flipTimer = setTimeout(() => real.play(), FLIP_MS)
 }
+
+onBeforeUnmount(() => clearTimeout(flipTimer))
 </script>
 
 <template>

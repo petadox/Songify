@@ -17,6 +17,7 @@ export function useClip(src) {
 
   let el = null
   let raf = null
+  let destroyed = false
 
   // 'timeupdate' only fires about four times a second, which visibly steps on
   // a clip this short — so drive the bar off the frame loop instead.
@@ -70,7 +71,27 @@ export function useClip(src) {
 
   // Resolves true if playback actually started, so the caller only spends one
   // of the three attempts on a clip that really played.
+  // Play once, silently, to satisfy the mobile autoplay rules: iOS only lets
+  // an element start programmatically after it has been played from inside a
+  // user gesture. Call this synchronously in the handler, then a later play()
+  // — after an await, or on a timer — is allowed.
+  function prime() {
+    if (destroyed) return
+    const audio = ensure()
+    audio.muted = true
+    Promise.resolve(audio.play())
+      .then(() => {
+        audio.pause()
+        audio.currentTime = 0
+      })
+      .catch(() => {})
+      .finally(() => {
+        audio.muted = false
+      })
+  }
+
   async function play() {
+    if (destroyed) return false
     const audio = ensure()
     try {
       audio.currentTime = 0
@@ -110,6 +131,9 @@ export function useClip(src) {
   }
 
   onBeforeUnmount(() => {
+    // Latched so a queued play() can't resurrect the element after the view is
+    // gone and leave audio playing over the next screen.
+    destroyed = true
     stopTicking()
     if (!el) return
     el.pause()
@@ -117,5 +141,5 @@ export function useClip(src) {
     el = null
   })
 
-  return { play, stop, playing, loading, error, progress }
+  return { play, prime, stop, playing, loading, error, progress }
 }
