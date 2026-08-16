@@ -34,7 +34,13 @@ crop_for() {
   esac
 }
 
-SIGMA=12
+# The teaser is blurred first, then hard-pixelated. Blur alone leaves the big
+# artist logos legible (the Λ on the Axwell Λ Ingrosso poster, the Weeknd
+# crosses); pixelation alone preserves them too, since they are large shapes.
+# Blurring first smears the shape, and the mosaic on top hides what survives
+# while keeping a deliberate pixel-art look.
+SIGMA=15
+BLOCKS_W=12   # mosaic columns across the teaser
 
 shopt -s nullglob
 count=0
@@ -50,10 +56,11 @@ for file in "$SRC"/[0-9]*_*.PNG "$SRC"/[0-9]*_*.png; do
   ffmpeg -y -loglevel error -i "$file" \
     -vf "scale=-1:900" -q:v 4 "$out/cover.jpg"
 
-  # Obscured teaser: crop away the type, blur what's left, lift the exposure
-  # a little so the very dark posters don't read as a black rectangle.
+  # Obscured teaser: crop away the type, blur, then mosaic. The exposure is
+  # lifted and contrast raised so the very dark posters don't read as a black
+  # rectangle once they're smeared.
   ffmpeg -y -loglevel error -i "$out/cover.jpg" \
-    -vf "crop=$(crop_for "$num"),gblur=sigma=$SIGMA,eq=brightness=0.10:saturation=1.25,scale=420:584" \
+    -vf "crop=$(crop_for "$num"),gblur=sigma=$SIGMA,eq=brightness=0.14:saturation=0.8:contrast=1.15,scale=$BLOCKS_W:-1:flags=neighbor,scale=420:584:flags=neighbor" \
     -q:v 6 "$out/blur.jpg"
 
   echo "  $name -> songs/$padded/{cover,blur}.jpg"

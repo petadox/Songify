@@ -10,7 +10,7 @@ const correct = 0
 <template>
   <div class="home">
     <header>
-      <h1>Songify</h1>
+      <h1>Eongify</h1>
       <p class="score">
         {{ played }} / {{ songs.length }} · {{ correct }} acertadas
       </p>
