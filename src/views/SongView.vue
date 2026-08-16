@@ -148,16 +148,12 @@ async function onReveal() {
       <template v-else>¡Error! Eres lamentable!</template>
     </p>
 
-    <template v-if="flipped">
-      <p v-if="result" class="outcome" :class="result">
-        {{ result === 'correct' ? '✓ ¡Acertada!' : '✕ Fallada' }}
-      </p>
-
-      <p class="title">
-        {{ song.title }}
-        <span v-if="song.artist" class="artist">{{ song.artist }}</span>
-      </p>
-    </template>
+    <!-- The verdict is carried by the colour of the title and the card's edge,
+         so there's no separate result line. -->
+    <p v-if="flipped" class="title" :class="result">
+      {{ song.title }}
+      <span v-if="song.artist" class="artist">{{ song.artist }}</span>
+    </p>
 
     <div class="controls">
       <template v-if="!flipped">
@@ -369,6 +365,21 @@ header {
   color: var(--text-dim);
 }
 
+.title.correct {
+  color: var(--ok);
+}
+
+.title.wrong {
+  color: var(--fail);
+}
+
+/* Follow the title's colour, just a shade softer to keep the hierarchy. */
+.title.correct .artist,
+.title.wrong .artist {
+  color: inherit;
+  opacity: 0.78;
+}
+
 .controls {
   margin-top: auto;
   padding-top: 24px;
@@ -501,21 +512,6 @@ header {
   text-align: center;
   font-size: 0.78rem;
   color: var(--text-dim);
-}
-
-.outcome {
-  margin: 14px 0 0;
-  text-align: center;
-  font-size: 1.05rem;
-  font-weight: 700;
-}
-
-.outcome.correct {
-  color: var(--ok);
-}
-
-.outcome.wrong {
-  color: var(--fail);
 }
 
 .err {
