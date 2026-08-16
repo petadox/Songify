@@ -1,9 +1,13 @@
-import { reactive, computed, watch } from 'vue'
+import { reactive, computed, watch, ref } from 'vue'
 import { songs } from '../data/songs'
+import { lifelines } from '../data/lifelines'
 
 export const MAX_PLAYS = 3
 
 const KEY = 'eongify.progress.v1'
+// Kept in its own key rather than folded into the progress blob, so the
+// existing saved shape needs no migration.
+const LIFELINE_KEY = 'eongify.lifelines.v1'
 const RESULTS = ['correct', 'wrong']
 
 // One entry per song the player has touched:
@@ -100,10 +104,65 @@ export const summary = computed(() => {
   }
 })
 
+// --- Lifelines -------------------------------------------------------------
+// Three of them, each spendable once for the entire game.
+
+function loadSpent() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LIFELINE_KEY))
+    // Keep only ids we still recognise, so renaming a lifeline can't resurrect
+    // or strand a spent one.
+    return Array.isArray(raw)
+      ? raw.filter((id) => lifelines.some((l) => l.id === id))
+      : []
+  } catch {
+    return []
+  }
+}
+
+const spent = reactive(new Set(loadSpent()))
+
+watch(
+  spent,
+  () => {
+    try {
+      localStorage.setItem(LIFELINE_KEY, JSON.stringify([...spent]))
+    } catch {
+      // Same as above — the session works, it just won't survive.
+    }
+  },
+  { deep: true },
+)
+
+export const isSpent = (id) => spent.has(id)
+
+export function spendLifeline(id) {
+  spent.add(id)
+}
+
+export const lifelinesLeft = computed(
+  () => lifelines.length - [...spent].length,
+)
+
+// Which lifeline modal is on screen, if any. Lives here rather than in
+// SongView because the overlay is rendered at app level — a Teleport inside a
+// route component breaks when the route Transition remounts it.
+export const activeLifeline = ref(null)
+
+export function openLifelineModal(lifeline) {
+  activeLifeline.value = lifeline
+}
+
+export function closeLifelineModal() {
+  activeLifeline.value = null
+}
+
 export function resetAll() {
   for (const id of Object.keys(state)) delete state[id]
+  spent.clear()
   try {
     localStorage.removeItem(KEY)
+    localStorage.removeItem(LIFELINE_KEY)
   } catch {
     // Nothing to do — the in-memory reset above already took effect.
   }

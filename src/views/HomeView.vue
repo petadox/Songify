@@ -1,6 +1,7 @@
 <script setup>
 import { songs } from '../data/songs'
-import { statusOf, summary, resetAll } from '../store/progress'
+import { lifelines } from '../data/lifelines'
+import { statusOf, summary, resetAll, isSpent } from '../store/progress'
 import SongCard from '../components/SongCard.vue'
 
 function onReset() {
@@ -16,6 +17,17 @@ function onReset() {
         {{ summary.played }} / {{ songs.length }} · {{ summary.correct }}
         {{ summary.correct === 1 ? 'acertada' : 'acertadas' }}
       </p>
+
+      <ul class="lifelines">
+        <li
+          v-for="l in lifelines"
+          :key="l.id"
+          :class="{ used: isSpent(l.id) }"
+        >
+          <span class="dot" aria-hidden="true"></span>
+          {{ l.label }}
+        </li>
+      </ul>
     </header>
 
     <ul class="grid">
@@ -63,6 +75,43 @@ h1 {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
+}
+
+/* Spent lifelines stay listed rather than disappearing, so the row reads as
+   "what you had" rather than silently shrinking. */
+.lifelines {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 12px;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.lifelines li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.lifelines .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+
+.lifelines .used {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+
+.lifelines .used .dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--text-dim);
 }
 
 /* Deliberately quiet — it wipes everything, so it shouldn't invite a tap. */

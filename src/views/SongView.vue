@@ -1,7 +1,14 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { findSong, COVER_RATIO } from '../data/songs'
-import { useSong, MAX_PLAYS } from '../store/progress'
+import { lifelines } from '../data/lifelines'
+import {
+  useSong,
+  MAX_PLAYS,
+  isSpent,
+  spendLifeline,
+  openLifelineModal,
+} from '../store/progress'
 import { useClip } from '../composables/useClip'
 
 const props = defineProps({ id: { type: String, required: true } })
@@ -49,6 +56,14 @@ function preload(src) {
     img.src = src
     setTimeout(resolve, 1500)
   })
+}
+
+// The modal and its sound are owned by App.vue; this just spends and opens.
+function useLifeline(lifeline) {
+  if (isSpent(lifeline.id)) return
+  distorted.stop()
+  spendLifeline(lifeline.id)
+  openLifelineModal(lifeline)
 }
 
 async function onReveal() {
@@ -111,6 +126,21 @@ async function onReveal() {
         <button class="secondary" :disabled="revealing" @click="onReveal">
           {{ revealing ? 'Resolviendo…' : 'Resolver' }}
         </button>
+
+        <!-- Hints only make sense before the answer is out. -->
+        <div class="lifelines">
+          <button
+            v-for="l in lifelines"
+            :key="l.id"
+            class="lifeline"
+            :class="{ used: isSpent(l.id) }"
+            :disabled="isSpent(l.id)"
+            :title="l.label"
+            @click="useLifeline(l)"
+          >
+            {{ l.label }}
+          </button>
+        </div>
       </template>
 
       <template v-else>
@@ -150,6 +180,7 @@ async function onReveal() {
         </p>
       </template>
     </div>
+
   </div>
 
   <div v-else class="missing">
@@ -321,6 +352,38 @@ header {
 .controls button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* Smaller and quieter than the main controls — they're a side option, not the
+   thing he should reach for first. */
+.lifelines {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.controls .lifeline {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  font-weight: 500;
+  line-height: 1.25;
+  overflow: hidden;
+}
+
+.controls .lifeline::before {
+  content: none; /* no playback fill on these */
+}
+
+.controls .lifeline.used {
+  opacity: 0.3;
+  text-decoration: line-through;
 }
 
 .ask {
