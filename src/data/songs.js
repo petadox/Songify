@@ -4,8 +4,10 @@
 // shows it, so it's only used as a text label on the reveal screen.
 // Assets live in public/songs/<id>/: cover.jpg (the full poster, shown on
 // reveal), blur.jpg (the obscured teaser in the song view), back.jpg (the
-// numbered card back used as the grid tile), plus distorted.mp3 and real.mp3.
-// Run scripts/import-images.sh to regenerate the images.
+// numbered card back used as the grid tile), plus distorted.mp3, real.mp3 and
+// full.mp3 — the complete track, offered only after the reveal.
+// Run scripts/import-images.sh to regenerate the images, and
+// scripts/import-full.sh to refresh the full-length tracks.
 
 import { normalise } from '../utils/text'
 
@@ -58,6 +60,8 @@ export const songs = RAW.map(([id, title, artist], index) => ({
   back: `${base}songs/${id}/back.jpg`,
   distortedAudio: `${base}songs/${id}/distorted.mp3`,
   realAudio: `${base}songs/${id}/real.mp3`,
+  // ~3.5MB each, so nothing here is fetched until the player taps for it.
+  fullAudio: `${base}songs/${id}/full.mp3`,
 }))
 
 export function findSong(id) {

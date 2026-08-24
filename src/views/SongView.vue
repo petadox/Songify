@@ -27,11 +27,19 @@ const {
 
 const titleGuess = ref('')
 
-// Both clips are set up here so their lifecycle hooks register during setup.
-// Neither fetches anything yet — useClip builds its Audio element on the first
-// play(), so the real clip stays off the wire until he asks for it.
+// All three sources are set up here so their lifecycle hooks register during
+// setup. None of them fetches anything yet — useClip builds its Audio element
+// on the first play(), so neither the real clip nor the ~3.5MB full track goes
+// on the wire until he asks for it.
 const distorted = useClip(song.value?.distortedAudio)
 const real = useClip(song.value?.realAudio)
+// The whole song, offered only after the reveal. Pausable and resumable: at
+// three-odd minutes, restarting from zero on every tap would be useless, and
+// its length is unknown until the metadata lands.
+const full = useClip(song.value?.fullAudio, {
+  resume: true,
+  fallbackDuration: null,
+})
 
 const {
   playing: distortedPlaying,
@@ -40,6 +48,29 @@ const {
   progress: distortedProgress,
 } = distorted
 const { playing: realPlaying, progress: realProgress } = real
+const {
+  playing: fullPlaying,
+  loading: fullLoading,
+  error: fullError,
+  progress: fullProgress,
+} = full
+
+// Only one of the three at a time — a full track running under a 5s clip is
+// just noise. The clips restart anyway, so they get stop(); the full song
+// keeps its position, so it only gets paused.
+function playClip(clip) {
+  clearTimeout(flipTimer) // don't let the post-flip autoplay land on top
+  full.pause()
+  for (const other of [distorted, real]) if (other !== clip) other.stop()
+  clip.play()
+}
+
+function toggleFull() {
+  clearTimeout(flipTimer)
+  distorted.stop()
+  real.stop()
+  full.toggle()
+}
 
 const canPlay = computed(() => playsLeft.value > 0 && !distortedPlaying.value)
 
@@ -48,6 +79,15 @@ async function playDistorted() {
   // Only spend an attempt if playback actually started.
   if (await distorted.play()) countPlay()
 }
+
+// What the button says depends on where the track is: a paused track offers to
+// carry on, an untouched or finished one offers to start.
+const fullLabel = computed(() => {
+  if (fullLoading.value) return 'Cargando…'
+  if (fullPlaying.value) return 'Pausar'
+  if (fullProgress.value > 0) return 'Continuar'
+  return 'Escuchar completa'
+})
 
 // `flipped` drives the visuals; the store's `revealed` is the saved fact.
 // They only differ for the moment between tapping Resolver and the poster
@@ -75,6 +115,7 @@ function preload(src) {
 function useLifeline(lifeline) {
   if (isSpent(lifeline.id)) return
   distorted.stop()
+  full.stop()
   spendLifeline(lifeline.id)
   openLifelineModal(lifeline, props.id)
 }
@@ -208,19 +249,31 @@ onBeforeUnmount(() => clearTimeout(flipTimer))
           class="primary"
           :style="{ '--p': realProgress }"
           :disabled="realPlaying"
-          @click="real.play()"
+          @click="playClip(real)"
         >
           <span class="label">
             {{ realPlaying ? 'Sonando…' : 'Escuchar original' }}
           </span>
         </button>
 
+        <!-- The whole track. Stays enabled while it plays — the same button is
+             the pause. -->
+        <button
+          class="secondary"
+          :style="{ '--p': fullProgress }"
+          :disabled="fullLoading"
+          @click="toggleFull"
+        >
+          <span class="label">{{ fullLabel }}</span>
+        </button>
+        <p v-if="fullError" class="err">No se pudo cargar la canción.</p>
+
         <!-- No limit once resolved — the answer is already out. -->
         <button
           class="secondary"
           :style="{ '--p': distortedProgress }"
           :disabled="distortedPlaying"
-          @click="distorted.play()"
+          @click="playClip(distorted)"
         >
           <span class="label">
             {{ distortedPlaying ? 'Sonando…' : 'Escuchar distorsionada' }}

@@ -3,13 +3,22 @@ import { ref, onBeforeUnmount } from 'vue'
 const STALL_TIMEOUT = 8000
 const FALLBACK_DURATION = 5 // clips are all 5s; only used if metadata is late
 
-// A single 5s clip. Kept deliberately small: one Audio element per clip, so
-// the distorted and real clips never fight over playback state.
+// A single piece of audio. Kept deliberately small: one Audio element per
+// source, so the distorted, real and full-length tracks never fight over
+// playback state.
 //
 // The element is created lazily on first play. On iOS an Audio element only
 // becomes playable if the first play() happens inside a user gesture, and
 // creating it up front doesn't help — so we build it on the tap itself.
-export function useClip(src) {
+//
+// Options:
+//   resume            play() picks up where a pause left off instead of
+//                     restarting. For the 5s clips restarting is what you
+//                     want; for a full 3-minute track it isn't.
+//   fallbackDuration  what to divide by while the real duration is still
+//                     unknown. `null` means don't guess — right for a track
+//                     whose length we don't know up front.
+export function useClip(src, { resume = false, fallbackDuration = FALLBACK_DURATION } = {}) {
   const playing = ref(false)
   const loading = ref(false)
   const error = ref(false)
@@ -23,10 +32,11 @@ export function useClip(src) {
   // a clip this short — so drive the bar off the frame loop instead.
   function tick() {
     if (!el) return
-    const total = Number.isFinite(el.duration) && el.duration > 0
-      ? el.duration
-      : FALLBACK_DURATION
-    progress.value = Math.min(el.currentTime / total, 1)
+    const known = Number.isFinite(el.duration) && el.duration > 0
+    const total = known ? el.duration : fallbackDuration
+    // No duration and nothing sane to assume — hold the fill where it is
+    // rather than sweeping it to the end against a made-up length.
+    if (total) progress.value = Math.min(el.currentTime / total, 1)
     raf = requestAnimationFrame(tick)
   }
 
@@ -52,7 +62,9 @@ export function useClip(src) {
     })
     el.addEventListener('pause', () => {
       playing.value = false
-      stopTicking()
+      // A resumable track keeps its fill while paused, so picking it back up
+      // reads as one continuous listen.
+      stopTicking(!resume)
     })
     el.addEventListener('playing', () => {
       playing.value = true
@@ -94,7 +106,8 @@ export function useClip(src) {
     if (destroyed) return false
     const audio = ensure()
     try {
-      audio.currentTime = 0
+      // A resumable track only rewinds once it has run to the end.
+      if (!resume || audio.ended) audio.currentTime = 0
       loading.value = true
       error.value = false // clear any previous failure so a retry can succeed
       // play() stays pending indefinitely while the media is stalled, which
@@ -123,6 +136,19 @@ export function useClip(src) {
     }
   }
 
+  // Leaves the position alone, so a later play() resumes from here.
+  function pause() {
+    if (el) el.pause()
+  }
+
+  async function toggle() {
+    if (playing.value) {
+      pause()
+      return false
+    }
+    return play()
+  }
+
   function stop() {
     if (!el) return
     el.pause()
@@ -141,5 +167,5 @@ export function useClip(src) {
     el = null
   })
 
-  return { play, prime, stop, playing, loading, error, progress }
+  return { play, prime, pause, toggle, stop, playing, loading, error, progress }
 }
