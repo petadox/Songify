@@ -53,6 +53,7 @@ const {
   loading: fullLoading,
   error: fullError,
   progress: fullProgress,
+  duration: fullDuration,
 } = full
 
 // Only one of the three at a time — a full track running under a 5s clip is
@@ -66,6 +67,10 @@ function playClip(clip) {
 }
 
 function toggleFull() {
+  if (swallowClick) {
+    swallowClick = false
+    return
+  }
   clearTimeout(flipTimer)
   distorted.stop()
   real.stop()
@@ -80,9 +85,82 @@ async function playDistorted() {
   if (await distorted.play()) countPlay()
 }
 
+// --- Dragging the full track ------------------------------------------------
+// The button doubles as the scrubber: a tap still plays or pauses, and only a
+// real drag seeks. Anything under this much horizontal travel is a tap — a
+// thumb never lands perfectly still.
+const DRAG_SLOP = 6
+
+const dragging = ref(false)
+// The press that might still become a drag: where it started, the button's box
+// measured once rather than on every frame of the move, and the last fraction
+// the finger reached — the release event isn't guaranteed to arrive, so the
+// position has to be remembered rather than read off it.
+let press = null
+// A drag ends with a pointerup the browser follows with a click. Swallow that
+// one, or letting go would also toggle playback.
+let swallowClick = false
+
+const fractionAt = (clientX, rect) =>
+  Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1)
+
+function onPressStart(event) {
+  if (event.button !== 0) return // only a primary press scrubs
+  swallowClick = false
+  press = {
+    x: event.clientX,
+    rect: event.currentTarget.getBoundingClientRect(),
+    at: null,
+  }
+  // Keeps the move and up events coming even once the finger leaves the button.
+  event.currentTarget.setPointerCapture?.(event.pointerId)
+}
+
+function onPressMove(event) {
+  if (!press) return
+  if (!dragging.value) {
+    if (Math.abs(event.clientX - press.x) < DRAG_SLOP) return
+    dragging.value = true
+    full.startScrub()
+  }
+  press.at = fractionAt(event.clientX, press.rect)
+  full.scrubTo(press.at)
+}
+
+// The one way out of a drag, whichever event ends it, and safe to call twice.
+// A gesture doesn't reliably end with a pointerup — capture can be lost, or the
+// browser can take the gesture over — and a drag left half-open would strand
+// the fill somewhere the audio isn't.
+function finishDrag(commit) {
+  const at = press?.at
+  press = null
+  if (!dragging.value) return // a plain tap — leave it to @click
+  dragging.value = false
+  if (commit && typeof at === 'number') {
+    swallowClick = true // the click the browser sends after the release
+    full.endScrub(at)
+  } else {
+    // The browser claimed the gesture — a vertical pan scrolling the page,
+    // most likely. Put the fill back where playback left it.
+    full.cancelScrub()
+  }
+}
+
+const clock = (seconds) => {
+  const whole = Math.max(0, Math.floor(seconds))
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`
+}
+
 // What the button says depends on where the track is: a paused track offers to
-// carry on, an untouched or finished one offers to start.
+// carry on, an untouched or finished one offers to start. Mid-drag it turns
+// into the readout instead — you can't aim at a point you can't see.
 const fullLabel = computed(() => {
+  if (dragging.value) {
+    const total = fullDuration.value
+    return total
+      ? `${clock(fullProgress.value * total)} / ${clock(total)}`
+      : `${Math.round(fullProgress.value * 100)}%`
+  }
   if (fullLoading.value) return 'Cargando…'
   if (fullPlaying.value) return 'Pausar'
   if (fullProgress.value > 0) return 'Continuar'
@@ -257,12 +335,19 @@ onBeforeUnmount(() => clearTimeout(flipTimer))
         </button>
 
         <!-- The whole track. Stays enabled while it plays — the same button is
-             the pause. -->
+             the pause — and doubles as its own scrubber: drag it sideways to
+             move through the song. -->
         <button
-          class="secondary"
+          class="secondary scrub"
+          :class="{ dragging }"
           :style="{ '--p': fullProgress }"
           :disabled="fullLoading"
           @click="toggleFull"
+          @pointerdown="onPressStart"
+          @pointermove="onPressMove"
+          @pointerup="finishDrag(true)"
+          @pointercancel="finishDrag(false)"
+          @lostpointercapture="finishDrag(true)"
         >
           <span class="label">{{ fullLabel }}</span>
         </button>
@@ -484,6 +569,37 @@ header {
 
 .label {
   position: relative; /* above the fill */
+}
+
+/* Horizontal drags are ours to scrub with; vertical ones stay with the browser
+   so a swipe that starts on the button still scrolls the page. */
+.scrub {
+  touch-action: pan-y;
+}
+
+/* Mid-drag the fill's leading edge is what he's aiming with, so draw it. */
+.controls .scrub::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--p, 0) * 100%);
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  pointer-events: none;
+}
+
+.controls .scrub.dragging::after {
+  opacity: 0.9;
+}
+
+/* No text selection or long-press menu getting in the way of a drag. */
+.controls .scrub.dragging {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .primary {

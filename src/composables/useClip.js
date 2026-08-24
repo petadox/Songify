@@ -18,25 +18,39 @@ const FALLBACK_DURATION = 5 // clips are all 5s; only used if metadata is late
 //   fallbackDuration  what to divide by while the real duration is still
 //                     unknown. `null` means don't guess — right for a track
 //                     whose length we don't know up front.
+//
+// The returned startScrub/scrubTo/endScrub trio lets a caller drag the
+// playback position around; see the Scrubbing section below.
 export function useClip(src, { resume = false, fallbackDuration = FALLBACK_DURATION } = {}) {
   const playing = ref(false)
   const loading = ref(false)
   const error = ref(false)
   const progress = ref(0) // 0..1 through the clip, for the button fill
+  const duration = ref(0) // seconds, 0 until the metadata lands
 
   let el = null
   let raf = null
   let destroyed = false
+  let scrubbing = false // while true the fill belongs to the finger, not playback
+  let pendingSeek = null // a scrub that landed before the audio was ready
+
+  const clamp01 = (n) => Math.min(Math.max(Number(n) || 0, 0), 1)
+
+  // Where the fill should sit for the current playback position.
+  function fillFromPlayback() {
+    if (!el) return 0
+    const total = duration.value || fallbackDuration
+    // No duration and nothing sane to assume — hold the fill where it is
+    // rather than sweeping it to the end against a made-up length.
+    if (!total) return progress.value
+    return clamp01(el.currentTime / total)
+  }
 
   // 'timeupdate' only fires about four times a second, which visibly steps on
   // a clip this short — so drive the bar off the frame loop instead.
   function tick() {
     if (!el) return
-    const known = Number.isFinite(el.duration) && el.duration > 0
-    const total = known ? el.duration : fallbackDuration
-    // No duration and nothing sane to assume — hold the fill where it is
-    // rather than sweeping it to the end against a made-up length.
-    if (total) progress.value = Math.min(el.currentTime / total, 1)
+    if (!scrubbing) progress.value = fillFromPlayback()
     raf = requestAnimationFrame(tick)
   }
 
@@ -56,6 +70,15 @@ export function useClip(src, { resume = false, fallbackDuration = FALLBACK_DURAT
     if (el) return el
     el = new Audio(src)
     el.preload = 'auto'
+    // Both events: 'loadedmetadata' is the usual source, but a stream whose
+    // length is refined later only reports it through 'durationchange'.
+    const noteDuration = () => {
+      if (!el || !Number.isFinite(el.duration) || el.duration <= 0) return
+      duration.value = el.duration
+      applyPendingSeek()
+    }
+    el.addEventListener('loadedmetadata', noteDuration)
+    el.addEventListener('durationchange', noteDuration)
     el.addEventListener('ended', () => {
       playing.value = false
       stopTicking()
@@ -108,6 +131,9 @@ export function useClip(src, { resume = false, fallbackDuration = FALLBACK_DURAT
     try {
       // A resumable track only rewinds once it has run to the end.
       if (!resume || audio.ended) audio.currentTime = 0
+      // A drag that happened before this element existed wins over both — it's
+      // the most recent thing he asked for.
+      applyPendingSeek()
       loading.value = true
       error.value = false // clear any previous failure so a retry can succeed
       // play() stays pending indefinitely while the media is stalled, which
@@ -136,6 +162,46 @@ export function useClip(src, { resume = false, fallbackDuration = FALLBACK_DURAT
     }
   }
 
+  // --- Scrubbing -------------------------------------------------------------
+  // A drag, driven by the caller: startScrub() takes the fill away from
+  // playback, scrubTo() moves it under the finger, and endScrub() commits the
+  // position to the audio. Nothing is seeked until the finger lifts — seeking
+  // continuously through an mp3 stutters and can stall the stream.
+
+  function applyPendingSeek() {
+    if (pendingSeek === null || !el || !duration.value) return
+    el.currentTime = pendingSeek * duration.value
+    pendingSeek = null
+  }
+
+  function startScrub() {
+    scrubbing = true
+  }
+
+  function scrubTo(fraction) {
+    progress.value = clamp01(fraction)
+  }
+
+  function endScrub(fraction) {
+    const at = clamp01(fraction)
+    progress.value = at
+    scrubbing = false
+    // Nothing has been fetched yet — don't start a download off a drag alone.
+    // Remember the spot and let the next play() jump to it.
+    if (!el || !duration.value) {
+      pendingSeek = at
+      return
+    }
+    el.currentTime = at * duration.value
+  }
+
+  // The browser took the gesture over (a vertical pan, say) — hand the fill
+  // back to playback without moving the audio.
+  function cancelScrub() {
+    scrubbing = false
+    progress.value = fillFromPlayback()
+  }
+
   // Leaves the position alone, so a later play() resumes from here.
   function pause() {
     if (el) el.pause()
@@ -150,7 +216,14 @@ export function useClip(src, { resume = false, fallbackDuration = FALLBACK_DURAT
   }
 
   function stop() {
-    if (!el) return
+    // Before the early return: a drag can leave a fill and a pending seek on a
+    // track that was never played, and stopping has to clear those too.
+    pendingSeek = null
+    scrubbing = false
+    if (!el) {
+      stopTicking()
+      return
+    }
     el.pause()
     el.currentTime = 0
     stopTicking()
@@ -167,5 +240,20 @@ export function useClip(src, { resume = false, fallbackDuration = FALLBACK_DURAT
     el = null
   })
 
-  return { play, prime, pause, toggle, stop, playing, loading, error, progress }
+  return {
+    play,
+    prime,
+    pause,
+    toggle,
+    stop,
+    startScrub,
+    scrubTo,
+    endScrub,
+    cancelScrub,
+    playing,
+    loading,
+    error,
+    progress,
+    duration,
+  }
 }
